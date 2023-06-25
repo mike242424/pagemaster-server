@@ -19,6 +19,10 @@ module.exports = {
       return dataSources.nyTimesBooksAPI.getPaperbackNonFictionRecommendations();
     },
     getGoogleBooksSearch: async (_, { query, page }, { dataSources }) => {
+      if (query === "" || query === null || query === undefined) {
+        throw new ApolloError("Book name must not be empty", "EMPTY_BOOK_NAME");
+      }
+
       return dataSources.googleBooksAPI.getGoogleBooksSearch(query, page);
     },
     getBooks: async (_, { userId }) => await Book.find({ userId }),

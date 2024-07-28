@@ -32,6 +32,13 @@ const startApolloServer = async () => {
   const app = express();
   const httpServer = http.createServer(app);
 
+  app.use(
+    cors({
+      origin: 'https://page-master-app.vercel.app',
+      credentials: true,
+    }),
+  );
+
   const server = new ApolloServer({
     typeDefs,
     resolvers,
@@ -40,15 +47,7 @@ const startApolloServer = async () => {
 
   await server.start();
 
-  app.use(
-    '/graphql',
-    cors({
-      origin: 'https://page-master-app.vercel.app',
-      credentials: true,
-    }),
-    express.json(),
-    expressMiddleware(server),
-  );
+  app.use('/graphql', express.json(), expressMiddleware(server));
 
   await new Promise((resolve) => httpServer.listen({ port }, resolve));
   console.log(`Server running on http://localhost:${port}/graphql`);

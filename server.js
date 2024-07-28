@@ -1,51 +1,57 @@
 require('dotenv').config();
-const cors = require("cors");
-const { ApolloServer } = require("@apollo/server");
-const { startStandaloneServer } = require("@apollo/server/standalone");
-const mongoose = require("mongoose");
+const { ApolloServer } = require('@apollo/server');
+const { expressMiddleware } = require('@apollo/server/express4');
+const { ApolloServerPluginDrainHttpServer } = require('apollo-server-core');
+const mongoose = require('mongoose');
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
 
-const NYTimesBooksAPI = require("./dataSources/nyTimesAPI");
-const GoogleBooksAPI = require("./dataSources/googleBooksAPI");
-const typeDefs = require("./schema/typeDefs");
-const resolvers = require("./schema/resolvers");
+const NYTimesBooksAPI = require('./dataSources/nyTimesAPI');
+const GoogleBooksAPI = require('./dataSources/googleBooksAPI');
+const typeDefs = require('./schema/typeDefs');
+const resolvers = require('./schema/resolvers');
 
 const port = process.env.PORT || 9000;
 
 const connectToMongoDB = async () => {
-  const db = await mongoose
-    .connect(process.env.MONGODB_URI)
-    .then(() => {
-      console.log(`Connected to MongoDB`);
-    })
-    .catch((err) => {
-      console.log(err);
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
     });
+    console.log(`Connected to MongoDB`);
+  } catch (err) {
+    console.error(err);
+  }
 };
 
 connectToMongoDB();
 
 const startApolloServer = async () => {
+  const app = express();
+  const httpServer = http.createServer(app);
+
   const server = new ApolloServer({
     typeDefs,
     resolvers,
-    cors: true,
+    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
   });
 
-  const { url } = await startStandaloneServer(server, {
-    listen: { port },
-    context: async () => {
-      const { cache } = server;
+  await server.start();
 
-      return {
-        dataSources: {
-          nyTimesBooksAPI: new NYTimesBooksAPI({ cache }),
-          googleBooksAPI: new GoogleBooksAPI({ cache }),
-        },
-      };
-    },
-  });
+  app.use(
+    '/graphql',
+    cors({
+      origin: 'https://page-master-app.vercel.app',
+      credentials: true,
+    }),
+    express.json(),
+    expressMiddleware(server),
+  );
 
-  console.log(`Server running on ${url}`);
+  await new Promise((resolve) => httpServer.listen({ port }, resolve));
+  console.log(`Server running on http://localhost:${port}/graphql`);
 };
 
 startApolloServer();
